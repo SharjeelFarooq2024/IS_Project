@@ -1,0 +1,158 @@
+{% extends 'base.html' %}
+
+{% block title %}Doctor Workspace · {{ doctor.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex flex-column flex-lg-row justify-content-between gap-3 align-items-lg-center">
+    <div>
+        <h1 class="page-title"><i class="fas fa-user-md"></i> {{ doctor.name }}</h1>
+        <p class="text-muted mb-0">{{ doctor.specialization or 'General Practitioner' }} · {{ doctor.email }}</p>
+    </div>
+    <a class="btn btn-outline-secondary" href="{{ url_for('main.landing') }}">
+        <i class="fas fa-arrow-left"></i> Back to Role Selection
+    </a>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="metric-card">
+            <span class="metric-label">Assigned Patients</span>
+            <span class="metric-value">{{ assigned_patients|length }}</span>
+            <i class="fas fa-people-group metric-icon"></i>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="metric-card">
+            <span class="metric-label">Health Records Authored</span>
+            <span class="metric-value">{{ records|length }}</span>
+            <i class="fas fa-file-circle-check metric-icon"></i>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="metric-card">
+            <span class="metric-label">Last Submission</span>
+            <span class="metric-value">{{ records[0].created_at.strftime('%b %d, %Y %H:%M') if records and records[0].created_at else '—' }}</span>
+            <i class="fas fa-clock metric-icon"></i>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-5">
+        <div class="card h-100">
+            <div class="card-header"><i class="fas fa-file-medical"></i> Create Health Record</div>
+            <div class="card-body">
+                <form method="post" action="{{ url_for('main.doctor_add_record') }}" class="form-styled">
+                    <div class="mb-3">
+                        <label class="form-label">Select Patient</label>
+                        <select class="form-select" name="patient_id" required>
+                            <option value="">Choose patient...</option>
+                            {% for patient in patients %}
+                                <option value="{{ patient.id }}">{{ patient.name }}{% if patient.email %} · {{ patient.email }}{% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Record Title</label>
+                        <input type="text" class="form-control" name="record_name" placeholder="Quarterly review">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Clinical Notes / Treatment Plan</label>
+                        <textarea class="form-control" name="encrypted_record" rows="5" placeholder="Encrypted summary of diagnosis, treatment, and follow-up" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Search Keywords</label>
+                        <input type="text" class="form-control" name="keyword_hash" placeholder="e.g. hypertension, annual-check" required>
+                        <small class="text-muted">Use comma or space separated keywords for quick retrieval.</small>
+                    </div>
+                    <button type="submit" class="btn btn-primary-custom btn-custom w-100">
+                        <i class="fas fa-upload"></i> Save Encrypted Record
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-7">
+        <div class="card h-100">
+            <div class="card-header d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3">
+                <span><i class="fas fa-list"></i> Health Records</span>
+                <form method="get" class="d-flex gap-2" action="{{ url_for('main.doctor_dashboard') }}">
+                    <input type="text" class="form-control" name="q" value="{{ search }}" placeholder="Search by keyword or title">
+                    <button class="btn btn-outline-light" type="submit"><i class="fas fa-search"></i></button>
+                </form>
+            </div>
+            <div class="card-body">
+                {% if records %}
+                    <div class="table-container">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Record</th>
+                                    <th scope="col">Patient</th>
+                                    <th scope="col">Keywords</th>
+                                    <th scope="col">Created</th>
+                                    <th scope="col" class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for record in records %}
+                                    <tr>
+                                        <td>{{ record.record_name or 'Untitled Record' }}</td>
+                                        <td>{{ record.patient.name if record.patient else 'Unknown' }}</td>
+                                        <td>{{ record.keyword_hash }}</td>
+                                        <td>{{ record.created_at.strftime('%b %d, %Y %H:%M') if record.created_at else 'N/A' }}</td>
+                                        <td class="text-end">
+                                            <div class="btn-group" role="group">
+                                                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('main.doctor_record_detail', record_id=record.id) }}">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                <a class="btn btn-sm btn-outline-warning" href="{{ url_for('main.doctor_edit_record', record_id=record.id) }}">
+                                                    <i class="fas fa-pen"></i>
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted mb-0">No records submitted yet. Use the form on the left to create the first entry.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-4">
+    <div class="card-header"><i class="fas fa-people-arrows"></i> Assigned Patients</div>
+    <div class="card-body">
+        {% if assigned_patients %}
+            <div class="table-container">
+                <table class="table table-striped align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th scope="col">Name</th>
+                            <th scope="col">Email</th>
+                            <th scope="col">Gender</th>
+                            <th scope="col">Date of Birth</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for patient in assigned_patients %}
+                            <tr>
+                                <td>{{ patient.name }}</td>
+                                <td>{{ patient.email or '—' }}</td>
+                                <td>{{ patient.gender or '—' }}</td>
+                                <td>{{ patient.dob.strftime('%b %d, %Y') if patient.dob else '—' }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="text-muted mb-0">No patients are linked to you yet. Submit a new health record to establish a patient relationship.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

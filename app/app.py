@@ -1,10 +1,17 @@
-from flask import Flask
+from app import create_app, db
 
-app = Flask(__name__)
+app = create_app()
 
-@app.route("/")
-def hello_world():
-    return "<p>Hello, World!</p>"
+
+@app.cli.command("init-db")
+def init_db_command():
+    """Initialise the database tables."""
+    with app.app_context():
+        db.create_all()
+    print("Database initialised.")
+
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    with app.app_context():
+        db.create_all()
+    app.run(debug=True, host="0.0.0.0", port=5000)

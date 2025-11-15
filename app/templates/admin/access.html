@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+
+{% block title %}Access Control · Secure Health Vault{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+    <div>
+        <h1 class="page-title"><i class="fas fa-people-arrows"></i> Doctor · Patient Access</h1>
+        <p class="text-muted mb-0">Grant or revoke which doctors are authorised to view individual patient records.</p>
+    </div>
+    <a href="{{ url_for('main.admin_dashboard') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Dashboard
+    </a>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-5">
+        <div class="card h-100">
+            <div class="card-header"><i class="fas fa-link"></i> Grant Access</div>
+            <div class="card-body">
+                <form method="post" class="form-styled">
+                    <div class="mb-3">
+                        <label class="form-label">Doctor</label>
+                        <select class="form-select" name="doctor_id" required>
+                            <option value="">Choose doctor...</option>
+                            {% for doctor in doctors %}
+                                <option value="{{ doctor.id }}">{{ doctor.name }}{% if doctor.specialization %} · {{ doctor.specialization }}{% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Patient</label>
+                        <select class="form-select" name="patient_id" required>
+                            <option value="">Choose patient...</option>
+                            {% for patient in patients %}
+                                <option value="{{ patient.id }}">{{ patient.name }}{% if patient.email %} · {{ patient.email }}{% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary-custom btn-custom w-100">
+                        <i class="fas fa-check"></i> Grant Access
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-7">
+        <div class="card h-100">
+            <div class="card-header"><i class="fas fa-list"></i> Active Assignments</div>
+            <div class="card-body">
+                {% if assignments %}
+                    <div class="table-container">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Doctor</th>
+                                    <th scope="col">Patient</th>
+                                    <th scope="col">Granted</th>
+                                    <th scope="col" class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for assignment in assignments %}
+                                    <tr>
+                                        <td>{{ assignment.doctor.name if assignment.doctor else '—' }}</td>
+                                        <td>{{ assignment.patient.name if assignment.patient else '—' }}</td>
+                                        <td>{{ assignment.created_at.strftime('%b %d, %Y %H:%M') if assignment.created_at else '—' }}</td>
+                                        <td class="text-end">
+                                            <form method="post" action="{{ url_for('main.admin_delete_access', assignment_id=assignment.id) }}" onsubmit="return confirm('Revoke this access?');">
+                                                <button class="btn btn-sm btn-outline-danger" type="submit">
+                                                    <i class="fas fa-ban"></i>
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted mb-0">No active access assignments yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

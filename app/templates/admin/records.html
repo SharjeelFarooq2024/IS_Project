@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+
+{% block title %}Health Records · Secure Health Vault{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+    <div>
+        <h1 class="page-title"><i class="fas fa-file-medical"></i> Health Records</h1>
+        <p class="text-muted mb-0">Review encrypted submissions and audit doctor activity across the platform.</p>
+    </div>
+    <a href="{{ url_for('main.admin_dashboard') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Dashboard
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-center mb-3" action="{{ url_for('main.admin_records') }}">
+            <div class="col-md-8">
+                <label class="visually-hidden" for="search">Search keyword</label>
+                <input type="text" id="search" name="q" value="{{ search }}" class="form-control"
+                       placeholder="Search by record name, keywords, or encrypted content">
+            </div>
+            <div class="col-md-4 d-grid d-md-flex gap-2">
+                <button type="submit" class="btn btn-primary-custom btn-custom flex-grow-1">
+                    <i class="fas fa-search"></i> Search Records
+                </button>
+                <a class="btn btn-outline-secondary flex-grow-1" href="{{ url_for('main.admin_records') }}">
+                    <i class="fas fa-rotate"></i> Reset
+                </a>
+            </div>
+        </form>
+
+        <div class="table-container">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">Record Name</th>
+                        <th scope="col">Patient</th>
+                        <th scope="col">Doctor</th>
+                        <th scope="col">Keywords</th>
+                        <th scope="col">Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if records %}
+                        {% for record in records %}
+                            <tr>
+                                <td>{{ record.id }}</td>
+                                <td>{{ record.record_name or 'Untitled Record' }}</td>
+                                <td>{{ record.patient.name if record.patient else 'Unknown Patient' }}</td>
+                                <td>{{ record.doctor.name if record.doctor else 'Unassigned' }}</td>
+                                <td>{{ record.keyword_hash }}</td>
+                                <td>{{ record.created_at.strftime('%b %d, %Y %H:%M') if record.created_at else 'N/A' }}</td>
+                            </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-4">No records found for the current filter.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

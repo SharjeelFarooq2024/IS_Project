@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+
+{% block title %}Admin Management · Secure Health Vault{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+    <div>
+        <h1 class="page-title"><i class="fas fa-user-shield"></i> Admin Management</h1>
+        <p class="text-muted mb-0">Create new administrator accounts and keep existing credentials up to date.</p>
+    </div>
+    <a href="{{ url_for('main.admin_dashboard') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Dashboard
+    </a>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header"><i class="fas fa-user-plus"></i> Register Admin</div>
+            <div class="card-body">
+                <form method="post" action="{{ url_for('main.admin_admins') }}" class="form-styled" data-hash-password="true">
+                    <div class="mb-3">
+                        <label class="form-label">Username</label>
+                        <input type="text" class="form-control" name="username" placeholder="admin_user" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" name="email" placeholder="admin@securevault.com">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Temporary Password</label>
+                        <input type="password" class="form-control" name="password" placeholder="Create a strong password" required data-password-field="true">
+                        <small class="text-muted">Share securely; the admin should change it after first login.</small>
+                    </div>
+                    <button type="submit" class="btn btn-primary-custom btn-custom w-100">
+                        <i class="fas fa-user-check"></i> Add Admin
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="card h-100">
+            <div class="card-header"><i class="fas fa-list"></i> Active Admins</div>
+            <div class="card-body">
+                {% if admins %}
+                    <div class="table-container">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th scope="col">#</th>
+                                    <th scope="col">Username</th>
+                                    <th scope="col">Email</th>
+                                    <th scope="col">Created</th>
+                                    <th scope="col" class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for admin_user in admins %}
+                                    <tr>
+                                        <td>{{ admin_user.id }}</td>
+                                        <td>{{ admin_user.username }}</td>
+                                        <td>{{ admin_user.email or '—' }}</td>
+                                        <td>{{ admin_user.created_at.strftime('%b %d, %Y') if admin_user.created_at else '—' }}</td>
+                                        <td class="text-end">
+                                            <div class="btn-group" role="group">
+                                                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('main.admin_edit_admin', admin_id=admin_user.id) }}">
+                                                    <i class="fas fa-pen"></i>
+                                                </a>
+                                                <form method="post" action="{{ url_for('main.admin_delete_admin', admin_id=admin_user.id) }}" onsubmit="return confirm('Remove this admin account?');">
+                                                    <button class="btn btn-sm btn-outline-danger" type="submit" {% if admin_user.id == g.current_user.id %}disabled title="Cannot delete the active session"{% endif %}>
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted mb-0">No admin accounts found. Use the form on the left to add the first administrator.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

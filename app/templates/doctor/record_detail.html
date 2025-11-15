@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+
+{% block title %}Record Details · {{ doctor.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+    <div>
+        <h1 class="page-title"><i class="fas fa-file-medical"></i> {{ record.record_name or 'Untitled Record' }}</h1>
+        <p class="text-muted mb-0">Patient: {{ record.patient.name if record.patient else 'Unknown' }} · Created {{ record.created_at.strftime('%b %d, %Y %H:%M') if record.created_at else 'N/A' }}</p>
+    </div>
+    <a href="{{ url_for('main.doctor_dashboard') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Doctor Dashboard
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-header"><i class="fas fa-shield-halved"></i> Encrypted Content</div>
+    <div class="card-body">
+        <p class="text-muted">The following payload remains encrypted at rest. Decrypt server-side prior to presenting to authorised clients.</p>
+        <pre class="encrypted-block">{{ record.encrypted_record }}</pre>
+        <div class="mt-3">
+            <strong>Search Keywords:</strong>
+            <span class="badge bg-secondary">{{ record.keyword_hash }}</span>
+        </div>
+    </div>
+</div>
+{% endblock %}

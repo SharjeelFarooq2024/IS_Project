@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ role|capitalize }} Login · Secure Health Vault{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6 col-xl-5">
+        <div class="role-card">
+            <div class="icon-wrapper {% if role == 'admin' %}icon-admins{% elif role == 'doctor' %}icon-doctors{% else %}icon-patients{% endif %}">
+                {% if role == 'admin' %}
+                    <i class="fas fa-user-shield"></i>
+                {% elif role == 'doctor' %}
+                    <i class="fas fa-user-md"></i>
+                {% else %}
+                    <i class="fas fa-hospital-user"></i>
+                {% endif %}
+            </div>
+            <h2 class="text-center">{{ role|capitalize }} Portal Login</h2>
+            <p class="text-muted text-center">Enter your email/username and password to continue.</p>
+            <form method="post" class="form-styled mt-3" data-hash-password="true">
+                <div class="mb-3">
+                    <label class="form-label">
+                        {% if role == 'admin' %}Username or Email{% else %}Email Address{% endif %}
+                    </label>
+                    <input type="text" class="form-control" name="identifier" placeholder="{{ 'admin@vault.com' if role == 'admin' else 'you@email.com' }}" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Password</label>
+                        <input type="password" class="form-control" name="password" placeholder="Enter your password" required data-password-field="true">
+                </div>
+                <button type="submit" class="btn btn-primary-custom btn-custom w-100">
+                    <i class="fas fa-right-to-bracket"></i> Sign In
+                </button>
+            </form>
+            <div class="text-center mt-3">
+                <a href="{{ url_for('main.landing') }}" class="text-decoration-none">
+                    <i class="fas fa-arrow-left"></i> Back to role selection
+                </a>
+            </div>
+            {% if role != 'admin' %}
+                <p class="text-muted small text-center mt-3">Accounts are created by the admin team. Contact your administrator if you need assistance.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

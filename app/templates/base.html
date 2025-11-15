@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>{% block title %}Secure Health Vault{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/favicon.svg') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('main.landing') }}">
+                <img src="{{ url_for('static', filename='img/favicon.svg') }}" alt="Secure Health Vault logo">
+                Secure Health Vault
+            </a>
+            <div class="d-flex align-items-center gap-3 ms-auto">
+                {% if g.user_role and g.current_user %}
+                    <span class="text-light small text-uppercase">{{ g.user_role }}</span>
+                    <span class="text-light small">{{ g.current_user.name if g.user_role != 'admin' else g.current_user.username }}</span>
+                    <a class="btn btn-sm btn-outline-light" href="{{ url_for('main.logout') }}">
+                        <i class="fas fa-right-from-bracket"></i> Logout
+                    </a>
+                {% else %}
+                    <a class="btn btn-sm btn-outline-light" href="{{ url_for('main.login', role='admin') }}">
+                        <i class="fas fa-right-to-bracket"></i> Login
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+    <div class="main-container">
+        <div class="container">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/password-hash.js') }}"></script>
+</body>
+</html>

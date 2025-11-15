@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+
+{% block title %}Edit Admin · Secure Health Vault{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+    <div>
+        <h1 class="page-title"><i class="fas fa-user-gear"></i> Update Admin</h1>
+        <p class="text-muted mb-0">Adjust username, contact details, or reset password for {{ admin_user.username }}.</p>
+    </div>
+    <a href="{{ url_for('main.admin_admins') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Admin List
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-header"><i class="fas fa-circle-info"></i> Admin Details</div>
+    <div class="card-body">
+        <form method="post" class="form-styled" data-hash-password="true">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Username</label>
+                    <input type="text" class="form-control" name="username" value="{{ admin_user.username }}" required>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Email</label>
+                    <input type="email" class="form-control" name="email" value="{{ admin_user.email }}">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Reset Password (optional)</label>
+                    <input type="password" class="form-control" name="password" placeholder="Leave blank to keep current password" data-password-field="true">
+                </div>
+            </div>
+            <div class="d-flex justify-content-end gap-3 mt-4">
+                <a href="{{ url_for('main.admin_admins') }}" class="btn btn-outline-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary-custom btn-custom">
+                    <i class="fas fa-check"></i> Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

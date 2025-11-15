@@ -1,35 +1,49 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Index</title>
-    <style>
-        :root{--bg:#fff;--muted:#666}
-        body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;line-height:1.6;margin:0;background:var(--bg);color:#111}
-        header, footer{background:#f7f7f7;padding:1rem;text-align:center}
-        main{max-width:900px;margin:1.5rem auto;padding:0 1rem}
-        a{color:royalblue;text-decoration:none}
-        a:hover{text-decoration:underline}
-        .lead{color:var(--muted)}
-    </style>
-</head>
-<body>
-    <header>
-        <h1>My App</h1>
-        <p class="lead">A simple starter page</p>
-    </header>
+{% extends 'base.html' %}
 
-    <main>
-        <section>
-            <h2>Get started</h2>
-            <p>This is a basic HTML template you can use as a starting point for your Django app.</p>
-            <p><a href="#">Learn more</a></p>
-        </section>
-    </main>
+{% block title %}Welcome · Secure Health Vault{% endblock %}
 
-    <footer>
-        <small>&copy; {% now "Y" %} My App</small>
-    </footer>
-</body>
-</html>
+{% block content %}
+<div class="header-section text-center">
+    <h1><i class="fas fa-lock-heart"></i> Secure Health Vault</h1>
+    <p class="lead">Choose your role to access personalised tools and data.</p>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-4">
+        <div class="role-card h-100">
+            <div class="icon-wrapper icon-admins">
+                <i class="fas fa-user-shield"></i>
+            </div>
+            <h3>Admin Portal</h3>
+            <p>Manage doctors, patients, health records and overall platform configuration.</p>
+            <a href="{{ url_for('main.login', role='admin') }}" class="btn btn-primary-custom btn-custom w-100">
+                <i class="fas fa-arrow-right"></i> Admin Login
+            </a>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="role-card h-100">
+            <div class="icon-wrapper icon-doctors">
+                <i class="fas fa-user-md"></i>
+            </div>
+            <h3>Doctor Workspace</h3>
+            <p>Upload encrypted health records, review assigned patients, and manage care plans.</p>
+            <a href="{{ url_for('main.login', role='doctor') }}" class="btn btn-primary-custom btn-custom w-100">
+                <i class="fas fa-stethoscope"></i> Doctor Login
+            </a>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="role-card h-100">
+            <div class="icon-wrapper icon-patients">
+                <i class="fas fa-hospital-user"></i>
+            </div>
+            <h3>Patient Portal</h3>
+            <p>Review personal health records, search by keyword, and keep profile details current.</p>
+            <a href="{{ url_for('main.login', role='patient') }}" class="btn btn-success-custom btn-custom w-100">
+                <i class="fas fa-user-lock"></i> Patient Login
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

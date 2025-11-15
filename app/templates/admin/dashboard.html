@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+
+{% block title %}Admin Dashboard · Secure Health Vault{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+    <div>
+        <h1 class="page-title"><i class="fas fa-gauge-high"></i> Admin Dashboard</h1>
+        <p class="text-muted mb-0">Monitor platform activity and drill into clinical data in a single glance.</p>
+    </div>
+    <a href="{{ url_for('main.admin_records') }}" class="btn btn-primary-custom btn-custom">
+        <i class="fas fa-file-medical"></i> View All Health Records
+    </a>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="metric-card">
+            <span class="metric-label">Doctors</span>
+            <span class="metric-value">{{ stats.doctors }}</span>
+            <i class="fas fa-user-md metric-icon"></i>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="metric-card">
+            <span class="metric-label">Patients</span>
+            <span class="metric-value">{{ stats.patients }}</span>
+            <i class="fas fa-hospital-user metric-icon"></i>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="metric-card">
+            <span class="metric-label">Health Records</span>
+            <span class="metric-value">{{ stats.records }}</span>
+            <i class="fas fa-file-medical metric-icon"></i>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="metric-card">
+            <span class="metric-label">Admins</span>
+            <span class="metric-value">{{ stats.admins }}</span>
+            <i class="fas fa-user-shield metric-icon"></i>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header"><i class="fas fa-users-cog"></i> Manage Users</div>
+            <div class="card-body">
+                <p class="text-muted">Add, update, or remove doctors and patients to keep the system accurate.</p>
+                <div class="d-grid gap-3">
+                    <a class="btn btn-outline-warning" href="{{ url_for('main.admin_admins') }}"><i class="fas fa-user-shield"></i> Admin Management</a>
+                    <a class="btn btn-outline-primary" href="{{ url_for('main.admin_doctors') }}"><i class="fas fa-user-md"></i> Doctor Management</a>
+                        <a class="btn btn-outline-success" href="{{ url_for('main.admin_patients') }}"><i class="fas fa-hospital-user"></i> Patient Management</a>
+                    <a class="btn btn-outline-info" href="{{ url_for('main.admin_access') }}"><i class="fas fa-people-arrows"></i> Access Control</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header"><i class="fas fa-clock"></i> Latest Health Records</div>
+            <div class="card-body">
+                {% if recent_records %}
+                    <div class="timeline">
+                        {% for record in recent_records %}
+                            <div class="timeline-item">
+                                <div class="timeline-icon"><i class="fas fa-notes-medical"></i></div>
+                                <div class="timeline-content">
+                                    <h5>{{ record.record_name or 'Untitled Record' }}</h5>
+                                    <p class="mb-1 text-muted">
+                                        <i class="fas fa-user"></i> {{ record.patient.name if record.patient else 'Unknown Patient' }}
+                                        · <i class="fas fa-user-md"></i> {{ record.doctor.name if record.doctor else 'Unassigned' }}
+                                    </p>
+                                    <small class="text-muted">{{ record.created_at.strftime('%b %d, %Y %H:%M') if record.created_at else 'Not timestamped' }}</small>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted mb-0">No health records available yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

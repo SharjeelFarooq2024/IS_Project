@@ -1,0 +1,120 @@
+{% extends 'base.html' %}
+
+{% block title %}Patient Portal · {{ patient.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex flex-column flex-lg-row justify-content-between gap-3 align-items-lg-center">
+    <div>
+        <h1 class="page-title"><i class="fas fa-hospital-user"></i> {{ patient.name }}</h1>
+        <p class="text-muted mb-0">{{ patient.email or 'Email not provided' }} · Member since {{ patient.created_at.strftime('%b %d, %Y') if patient.created_at else 'N/A' }}</p>
+    </div>
+    <a class="btn btn-outline-secondary" href="{{ url_for('main.landing') }}">
+        <i class="fas fa-arrow-left"></i> Back to Role Selection
+    </a>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="metric-card">
+            <span class="metric-label">Health Records</span>
+            <span class="metric-value">{{ records|length }}</span>
+            <i class="fas fa-file-medical metric-icon"></i>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="metric-card">
+            <span class="metric-label">Last Update</span>
+            <span class="metric-value">{{ records[0].created_at.strftime('%b %d, %Y %H:%M') if records and records[0].created_at else '—' }}</span>
+            <i class="fas fa-clock metric-icon"></i>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="metric-card">
+            <span class="metric-label">Primary Physician</span>
+            <span class="metric-value">{{ records[0].doctor.name if records and records[0].doctor else '—' }}</span>
+            <i class="fas fa-user-md metric-icon"></i>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="card h-100">
+            <div class="card-header d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3">
+                <span><i class="fas fa-notes-medical"></i> My Health Records</span>
+                <form method="get" class="d-flex gap-2" action="{{ url_for('main.patient_dashboard') }}">
+                    <input type="text" class="form-control" name="q" value="{{ search }}" placeholder="Search by keyword or title">
+                    <button class="btn btn-outline-light" type="submit"><i class="fas fa-search"></i></button>
+                </form>
+            </div>
+            <div class="card-body">
+                {% if records %}
+                    <div class="table-container">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Record</th>
+                                    <th scope="col">Doctor</th>
+                                    <th scope="col">Keywords</th>
+                                    <th scope="col">Date</th>
+                                    <th scope="col" class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for record in records %}
+                                    <tr>
+                                        <td>{{ record.record_name or 'Untitled Record' }}</td>
+                                        <td>{{ record.doctor.name if record.doctor else '—' }}</td>
+                                        <td>{{ record.keyword_hash }}</td>
+                                        <td>{{ record.created_at.strftime('%b %d, %Y %H:%M') if record.created_at else 'N/A' }}</td>
+                                        <td class="text-end">
+                                            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('main.patient_record_detail', record_id=record.id) }}">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted mb-0">No records available yet. Contact your physician to upload your first encrypted record.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="card h-100">
+            <div class="card-header"><i class="fas fa-id-card"></i> Profile</div>
+            <div class="card-body">
+                <form method="post" action="{{ url_for('main.patient_update_profile') }}" class="form-styled">
+                    <div class="mb-3">
+                        <label class="form-label">Full Name</label>
+                        <input type="text" class="form-control" name="name" value="{{ patient.name }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" name="email" value="{{ patient.email }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Date of Birth</label>
+                        <input type="date" class="form-control" name="dob" value="{{ patient.dob.strftime('%Y-%m-%d') if patient.dob else '' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Gender</label>
+                        <select class="form-select" name="gender">
+                            <option value="" {% if not patient.gender %}selected{% endif %}>Prefer not to say</option>
+                            <option value="Male" {% if patient.gender == 'Male' %}selected{% endif %}>Male</option>
+                            <option value="Female" {% if patient.gender == 'Female' %}selected{% endif %}>Female</option>
+                            <option value="Other" {% if patient.gender == 'Other' %}selected{% endif %}>Other</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-success-custom btn-custom w-100">
+                        <i class="fas fa-save"></i> Update Profile
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

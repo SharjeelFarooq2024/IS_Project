@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+
+{% block title %}Edit Record · {{ doctor.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+    <div>
+        <h1 class="page-title"><i class="fas fa-file-pen"></i> Update Health Record</h1>
+        <p class="text-muted mb-0">Edit details for {{ record.record_name or 'Untitled Record' }}.</p>
+    </div>
+    <a href="{{ url_for('main.doctor_dashboard') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Doctor Dashboard
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-header"><i class="fas fa-circle-info"></i> Record Details</div>
+    <div class="card-body">
+        <form method="post" class="form-styled">
+            <div class="mb-3">
+                <label class="form-label">Record Title</label>
+                <input type="text" class="form-control" name="record_name" value="{{ record.record_name }}">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Encrypted Clinical Notes</label>
+                <textarea class="form-control" rows="6" name="encrypted_record" required>{{ record.encrypted_record }}</textarea>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Search Keywords</label>
+                <input type="text" class="form-control" name="keyword_hash" value="{{ record.keyword_hash }}" required>
+            </div>
+            <div class="d-flex justify-content-end gap-3">
+                <a href="{{ url_for('main.doctor_dashboard') }}" class="btn btn-outline-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary-custom btn-custom">
+                    <i class="fas fa-check"></i> Save Record
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
