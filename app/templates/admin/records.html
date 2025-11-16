@@ -35,7 +35,7 @@
             <table class="table table-hover align-middle mb-0">
                 <thead>
                     <tr>
-                        <th scope="col">#</th>
+                        <th scope="col">ID</th>
                         <th scope="col">Record Name</th>
                         <th scope="col">Patient</th>
                         <th scope="col">Doctor</th>
@@ -48,9 +48,9 @@
                         {% for record in records %}
                             <tr>
                                 <td>{{ record.id }}</td>
-                                <td>{{ record.record_name or 'Untitled Record' }}</td>
-                                <td>{{ record.patient.name if record.patient else 'Unknown Patient' }}</td>
-                                <td>{{ record.doctor.name if record.doctor else 'Unassigned' }}</td>
+                                <td>{{ record.decrypted_record_name or 'Untitled Record' }}</td>
+                                <td>{{ record.patient.decrypted_name if record.patient else 'Unknown Patient' }}</td>
+                                <td>{{ record.doctor.decrypted_name if record.doctor else 'Unassigned' }}</td>
                                 <td>{{ record.keyword_hash }}</td>
                                 <td>{{ record.created_at.strftime('%b %d, %Y %H:%M') if record.created_at else 'N/A' }}</td>
                             </tr>

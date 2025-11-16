@@ -1,6 +1,10 @@
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from app.config import DB_URI
+from dotenv import load_dotenv
+import os
+
+load_dotenv() # Load environment variables from .env file
 
 db = SQLAlchemy()
 

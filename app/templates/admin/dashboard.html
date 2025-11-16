@@ -69,10 +69,10 @@
                             <div class="timeline-item">
                                 <div class="timeline-icon"><i class="fas fa-notes-medical"></i></div>
                                 <div class="timeline-content">
-                                    <h5>{{ record.record_name or 'Untitled Record' }}</h5>
+                                    <h5>{{ record.decrypted_record_name or 'Untitled Record' }}</h5>
                                     <p class="mb-1 text-muted">
-                                        <i class="fas fa-user"></i> {{ record.patient.name if record.patient else 'Unknown Patient' }}
-                                        · <i class="fas fa-user-md"></i> {{ record.doctor.name if record.doctor else 'Unassigned' }}
+                                        <i class="fas fa-user"></i> {{ record.patient.decrypted_name if record.patient else 'Unknown Patient' }}
+                                        · <i class="fas fa-user-md"></i> {{ record.doctor.decrypted_name if record.doctor else 'Unassigned' }}
                                     </p>
                                     <small class="text-muted">{{ record.created_at.strftime('%b %d, %Y %H:%M') if record.created_at else 'Not timestamped' }}</small>
                                 </div>

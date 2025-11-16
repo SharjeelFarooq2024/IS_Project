@@ -18,8 +18,13 @@
             </a>
             <div class="d-flex align-items-center gap-3 ms-auto">
                 {% if g.user_role and g.current_user %}
+                    {% if g.user_role == 'admin' %}
+                        {% set display_name = g.current_user.decrypted_username %}
+                    {% else %}
+                        {% set display_name = g.current_user.decrypted_name %}
+                    {% endif %}
                     <span class="text-light small text-uppercase">{{ g.user_role }}</span>
-                    <span class="text-light small">{{ g.current_user.name if g.user_role != 'admin' else g.current_user.username }}</span>
+                    <span class="text-light small">{{ display_name or 'Account' }}</span>
                     <a class="btn btn-sm btn-outline-light" href="{{ url_for('main.logout') }}">
                         <i class="fas fa-right-from-bracket"></i> Logout
                     </a>

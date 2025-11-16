@@ -24,7 +24,7 @@
                         <select class="form-select" name="doctor_id" required>
                             <option value="">Choose doctor...</option>
                             {% for doctor in doctors %}
-                                <option value="{{ doctor.id }}">{{ doctor.name }}{% if doctor.specialization %} · {{ doctor.specialization }}{% endif %}</option>
+                                <option value="{{ doctor.id }}">{{ doctor.decrypted_name }}{% if doctor.specialization %} · {{ doctor.specialization }}{% endif %}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -33,7 +33,7 @@
                         <select class="form-select" name="patient_id" required>
                             <option value="">Choose patient...</option>
                             {% for patient in patients %}
-                                <option value="{{ patient.id }}">{{ patient.name }}{% if patient.email %} · {{ patient.email }}{% endif %}</option>
+                                <option value="{{ patient.id }}">{{ patient.decrypted_name }}{% if patient.decrypted_email %} · {{ patient.decrypted_email }}{% endif %}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -62,8 +62,8 @@
                             <tbody>
                                 {% for assignment in assignments %}
                                     <tr>
-                                        <td>{{ assignment.doctor.name if assignment.doctor else '—' }}</td>
-                                        <td>{{ assignment.patient.name if assignment.patient else '—' }}</td>
+                                        <td>{{ assignment.doctor.decrypted_name if assignment.doctor else '—' }}</td>
+                                        <td>{{ assignment.patient.decrypted_name if assignment.patient else '—' }}</td>
                                         <td>{{ assignment.created_at.strftime('%b %d, %Y %H:%M') if assignment.created_at else '—' }}</td>
                                         <td class="text-end">
                                             <form method="post" action="{{ url_for('main.admin_delete_access', assignment_id=assignment.id) }}" onsubmit="return confirm('Revoke this access?');">

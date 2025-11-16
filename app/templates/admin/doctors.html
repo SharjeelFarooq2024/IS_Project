@@ -32,7 +32,7 @@
                         <input type="email" class="form-control" name="email" placeholder="doctor@securehealth.com" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Temporary Password</label>
+                        <label class="form-label">Password</label>
                         <input type="password" class="form-control" name="password" placeholder="Generate a starter password" required data-password-field="true">
                         <small class="text-muted">Share securely with the doctor so they can change it on first login.</small>
                     </div>
@@ -52,7 +52,7 @@
                         <table class="table table-hover align-middle mb-0">
                             <thead>
                                 <tr>
-                                    <th scope="col">#</th>
+                                    <th scope="col">ID</th>
                                     <th scope="col">Name</th>
                                     <th scope="col">Specialization</th>
                                     <th scope="col">Email</th>
@@ -64,11 +64,11 @@
                                     <tr>
                                         <td>{{ doctor.id }}</td>
                                         <td>
-                                            <strong>{{ doctor.name }}</strong><br>
+                                            <strong>{{ doctor.decrypted_name }}</strong><br>
                                             <small class="text-muted">Joined {{ doctor.created_at.strftime('%b %d, %Y') if doctor.created_at else 'N/A' }}</small>
                                         </td>
                                         <td>{{ doctor.specialization or '—' }}</td>
-                                        <td>{{ doctor.email }}</td>
+                                        <td>{{ doctor.decrypted_email }}</td>
                                         <td class="text-end">
                                             <div class="btn-group" role="group">
                                                 <a class="btn btn-sm btn-outline-primary" href="{{ url_for('main.admin_edit_doctor', doctor_id=doctor.id) }}">

@@ -1,12 +1,12 @@
 {% extends 'base.html' %}
 
-{% block title %}Patient Portal · {{ patient.name }}{% endblock %}
+{% block title %}Patient Portal · {{ patient.decrypted_name }}{% endblock %}
 
 {% block content %}
 <div class="page-header d-flex flex-column flex-lg-row justify-content-between gap-3 align-items-lg-center">
     <div>
-        <h1 class="page-title"><i class="fas fa-hospital-user"></i> {{ patient.name }}</h1>
-        <p class="text-muted mb-0">{{ patient.email or 'Email not provided' }} · Member since {{ patient.created_at.strftime('%b %d, %Y') if patient.created_at else 'N/A' }}</p>
+        <h1 class="page-title"><i class="fas fa-hospital-user"></i> {{ patient.decrypted_name }}</h1>
+        <p class="text-muted mb-0">{{ patient.decrypted_email or 'Email not provided' }} · Member since {{ patient.created_at.strftime('%b %d, %Y') if patient.created_at else 'N/A' }}</p>
     </div>
     <a class="btn btn-outline-secondary" href="{{ url_for('main.landing') }}">
         <i class="fas fa-arrow-left"></i> Back to Role Selection
@@ -31,7 +31,7 @@
     <div class="col-md-4">
         <div class="metric-card">
             <span class="metric-label">Primary Physician</span>
-            <span class="metric-value">{{ records[0].doctor.name if records and records[0].doctor else '—' }}</span>
+            <span class="metric-value">{{ records[0].doctor.decrypted_name if records and records[0].doctor else '—' }}</span>
             <i class="fas fa-user-md metric-icon"></i>
         </div>
     </div>
@@ -63,8 +63,8 @@
                             <tbody>
                                 {% for record in records %}
                                     <tr>
-                                        <td>{{ record.record_name or 'Untitled Record' }}</td>
-                                        <td>{{ record.doctor.name if record.doctor else '—' }}</td>
+                                        <td>{{ record.decrypted_record_name or 'Untitled Record' }}</td>
+                                        <td>{{ record.doctor.decrypted_name if record.doctor else '—' }}</td>
                                         <td>{{ record.keyword_hash }}</td>
                                         <td>{{ record.created_at.strftime('%b %d, %Y %H:%M') if record.created_at else 'N/A' }}</td>
                                         <td class="text-end">
@@ -90,11 +90,11 @@
                 <form method="post" action="{{ url_for('main.patient_update_profile') }}" class="form-styled">
                     <div class="mb-3">
                         <label class="form-label">Full Name</label>
-                        <input type="text" class="form-control" name="name" value="{{ patient.name }}" required>
+                        <input type="text" class="form-control" name="name" value="{{ patient.decrypted_name }}" required>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Email</label>
-                        <input type="email" class="form-control" name="email" value="{{ patient.email }}" required>
+                        <input type="email" class="form-control" name="email" value="{{ patient.decrypted_email }}" required>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Date of Birth</label>

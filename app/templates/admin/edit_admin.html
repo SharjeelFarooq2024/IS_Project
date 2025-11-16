@@ -6,7 +6,7 @@
 <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
     <div>
         <h1 class="page-title"><i class="fas fa-user-gear"></i> Update Admin</h1>
-        <p class="text-muted mb-0">Adjust username, contact details, or reset password for {{ admin_user.username }}.</p>
+        <p class="text-muted mb-0">Adjust username, contact details, or reset password for {{ admin_user.decrypted_username }}.</p>
     </div>
     <a href="{{ url_for('main.admin_admins') }}" class="btn btn-outline-secondary">
         <i class="fas fa-arrow-left"></i> Back to Admin List
@@ -20,11 +20,11 @@
             <div class="row g-3">
                 <div class="col-md-6">
                     <label class="form-label">Username</label>
-                    <input type="text" class="form-control" name="username" value="{{ admin_user.username }}" required>
+                    <input type="text" class="form-control" name="username" value="{{ admin_user.decrypted_username }}" required>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">Email</label>
-                    <input type="email" class="form-control" name="email" value="{{ admin_user.email }}">
+                    <input type="email" class="form-control" name="email" value="{{ admin_user.decrypted_email }}">
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">Reset Password (optional)</label>

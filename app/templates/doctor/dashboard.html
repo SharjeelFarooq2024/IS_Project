@@ -1,12 +1,12 @@
 {% extends 'base.html' %}
 
-{% block title %}Doctor Workspace · {{ doctor.name }}{% endblock %}
+{% block title %}Doctor Workspace · {{ doctor.decrypted_name }}{% endblock %}
 
 {% block content %}
 <div class="page-header d-flex flex-column flex-lg-row justify-content-between gap-3 align-items-lg-center">
     <div>
-        <h1 class="page-title"><i class="fas fa-user-md"></i> {{ doctor.name }}</h1>
-        <p class="text-muted mb-0">{{ doctor.specialization or 'General Practitioner' }} · {{ doctor.email }}</p>
+        <h1 class="page-title"><i class="fas fa-user-md"></i> {{ doctor.decrypted_name }}</h1>
+        <p class="text-muted mb-0">{{ doctor.specialization or 'General Practitioner' }} · {{ doctor.decrypted_email }}</p>
     </div>
     <a class="btn btn-outline-secondary" href="{{ url_for('main.landing') }}">
         <i class="fas fa-arrow-left"></i> Back to Role Selection
@@ -48,7 +48,7 @@
                         <select class="form-select" name="patient_id" required>
                             <option value="">Choose patient...</option>
                             {% for patient in patients %}
-                                <option value="{{ patient.id }}">{{ patient.name }}{% if patient.email %} · {{ patient.email }}{% endif %}</option>
+                                <option value="{{ patient.id }}">{{ patient.decrypted_name }}{% if patient.decrypted_email %} · {{ patient.decrypted_email }}{% endif %}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -62,8 +62,8 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Search Keywords</label>
-                        <input type="text" class="form-control" name="keyword_hash" placeholder="e.g. hypertension, annual-check" required>
-                        <small class="text-muted">Use comma or space separated keywords for quick retrieval.</small>
+                        <input type="text" class="form-control" name="keyword_hash" placeholder="Optional extra tags like hypertension">
+                        <small class="text-muted">We auto-extract highlights; add anything else that helps retrieval.</small>
                     </div>
                     <button type="submit" class="btn btn-primary-custom btn-custom w-100">
                         <i class="fas fa-upload"></i> Save Encrypted Record
@@ -97,8 +97,8 @@
                             <tbody>
                                 {% for record in records %}
                                     <tr>
-                                        <td>{{ record.record_name or 'Untitled Record' }}</td>
-                                        <td>{{ record.patient.name if record.patient else 'Unknown' }}</td>
+                                        <td>{{ record.decrypted_record_name or 'Untitled Record' }}</td>
+                                        <td>{{ record.patient.decrypted_name if record.patient else 'Unknown' }}</td>
                                         <td>{{ record.keyword_hash }}</td>
                                         <td>{{ record.created_at.strftime('%b %d, %Y %H:%M') if record.created_at else 'N/A' }}</td>
                                         <td class="text-end">
@@ -141,8 +141,8 @@
                     <tbody>
                         {% for patient in assigned_patients %}
                             <tr>
-                                <td>{{ patient.name }}</td>
-                                <td>{{ patient.email or '—' }}</td>
+                                <td>{{ patient.decrypted_name }}</td>
+                                <td>{{ patient.decrypted_email or '—' }}</td>
                                 <td>{{ patient.gender or '—' }}</td>
                                 <td>{{ patient.dob.strftime('%b %d, %Y') if patient.dob else '—' }}</td>
                             </tr>
