@@ -59,6 +59,7 @@ STOPWORDS = {
     'how',
     'in',
     'is',
+    'has',
     'it',
     'of',
     'on',
