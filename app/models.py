@@ -64,3 +64,13 @@ class HealthRecordKeyword(db.Model):
     record_id = db.Column(db.Integer, db.ForeignKey('health_records.id', ondelete='CASCADE'), nullable=False)
     encrypted_keyword = db.Column(db.String(64), nullable=False, index=True)
     created_at = db.Column(db.DateTime, server_default=db.func.current_timestamp())
+
+
+class UserSessionLog(db.Model):
+    __tablename__ = 'user_session_logs'
+    id = db.Column(db.Integer, primary_key=True)
+    user_role = db.Column(db.Enum('admin', 'doctor', 'patient'), nullable=False, index=True)
+    user_id = db.Column(db.Integer, index=True)
+    event = db.Column(db.Enum('login', 'logout'), nullable=False)
+    user_lookup = db.Column(db.String(64))
+    created_at = db.Column(db.DateTime, server_default=db.func.current_timestamp(), index=True)

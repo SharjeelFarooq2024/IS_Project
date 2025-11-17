@@ -12,6 +12,7 @@ from app.models import (
     HealthRecord,
     HealthRecordKeyword,
     DoctorPatientAccess,
+    UserSessionLog,
 )
 
 from app.security.encryption import encrypt_data
@@ -149,6 +150,24 @@ def _hash_identity(value: str | None) -> str | None:
     return hash_keyword(normalized) if normalized else None
 
 
+def _log_session_event(role: str | None, user_id: int | None, event: str, lookup: str | None = None):
+    if role not in ROLE_HOME:
+        return
+
+    try:
+        entry = UserSessionLog(
+            user_role=role,
+            user_id=user_id,
+            event=event,
+            user_lookup=lookup,
+        )
+        db.session.add(entry)
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        main.logger.error('Unable to persist %s event for %s (id=%s): %s', event, role, user_id, exc)
+
+
 def _decrypt_admin(admin: Admin | None):
     if admin is None:
         return None
@@ -174,6 +193,61 @@ def _decrypt_patient(patient: Patient | None):
     patient.decrypted_name = decrypt_data(patient.name) or ''
     patient.decrypted_email = decrypt_data(patient.email) or ''
     return patient
+
+
+def _prepare_session_logs(logs: list[UserSessionLog]) -> list[dict]:
+    admin_ids = {log.user_id for log in logs if log.user_role == 'admin' and log.user_id}
+    doctor_ids = {log.user_id for log in logs if log.user_role == 'doctor' and log.user_id}
+    patient_ids = {log.user_id for log in logs if log.user_role == 'patient' and log.user_id}
+
+    admin_map: dict[int, Admin] = {}
+    doctor_map: dict[int, Doctor] = {}
+    patient_map: dict[int, Patient] = {}
+
+    if admin_ids:
+        admins = Admin.query.filter(Admin.id.in_(admin_ids)).all()
+        for admin in admins:
+            _decrypt_admin(admin)
+            admin_map[admin.id] = admin
+
+    if doctor_ids:
+        doctors = Doctor.query.filter(Doctor.id.in_(doctor_ids)).all()
+        for doctor in doctors:
+            _decrypt_doctor(doctor)
+            doctor_map[doctor.id] = doctor
+
+    if patient_ids:
+        patients = Patient.query.filter(Patient.id.in_(patient_ids)).all()
+        for patient in patients:
+            _decrypt_patient(patient)
+            patient_map[patient.id] = patient
+
+    entries: list[dict] = []
+    for log in logs:
+        display_name = 'Account removed'
+        if log.user_role == 'admin':
+            user = admin_map.get(log.user_id)
+            display_name = user.decrypted_username if user else display_name
+        elif log.user_role == 'doctor':
+            user = doctor_map.get(log.user_id)
+            display_name = user.decrypted_name if user else display_name
+        elif log.user_role == 'patient':
+            user = patient_map.get(log.user_id)
+            display_name = user.decrypted_name if user else display_name
+
+        entries.append(
+            {
+                'id': log.id,
+                'user_id': log.user_id,
+                'role': log.user_role,
+                'event': log.event,
+                'lookup': log.user_lookup,
+                'display_name': display_name,
+                'created_at': log.created_at,
+            }
+        )
+
+    return entries
 
 
 @main.before_app_request
@@ -256,8 +330,9 @@ def login(role):
             flash('Both fields are required.', 'danger')
             return redirect(url_for('main.login', role=role))
 
+        lookup = _hash_identity(identifier)
+
         if role == 'admin':
-            lookup = _hash_identity(identifier)
             user = None
             if lookup:
                 user = Admin.query.filter(
@@ -271,10 +346,8 @@ def login(role):
                     (Admin.username == identifier) | (Admin.email == identifier)
                 ).first()
         elif role == 'doctor':
-            lookup = _hash_identity(identifier)
             user = Doctor.query.filter_by(email_lookup=lookup).first() if lookup else None
         else:
-            lookup = _hash_identity(identifier)
             user = Patient.query.filter_by(email_lookup=lookup).first() if lookup else None
 
         if user is None or user.password_hash != password:
@@ -282,6 +355,7 @@ def login(role):
             return redirect(url_for('main.login', role=role))
 
         _login_user(role, user.id)
+        _log_session_event(role, user.id, 'login', lookup)
         flash('Login successful.', 'success')
         return redirect(url_for(ROLE_HOME[role]))
 
@@ -290,10 +364,14 @@ def login(role):
 
 @main.route('/logout')
 def logout():
-    role = session.get('user_role', 'admin')
+    role = session.get('user_role')
+    user_id = session.get('user_id')
+    if role in ROLE_HOME:
+        _log_session_event(role, user_id, 'logout')
+    redirect_role = role if role in ROLE_HOME else 'admin'
     _logout_user()
     flash('You have been logged out.', 'success')
-    return redirect(url_for('main.login', role=role))
+    return redirect(url_for('main.login', role=redirect_role))
 
 
 # ----------------------
@@ -331,6 +409,20 @@ def admin_dashboard():
         recent_records=recent_records,
         assignments=assignments,
     )
+
+
+@main.route('/admin/logs')
+@role_required('admin')
+def admin_logs():
+    limit = request.args.get('limit', default=250, type=int)
+    limit = max(1, min(limit or 250, 1000))
+    logs = (
+        UserSessionLog.query.order_by(UserSessionLog.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    entries = _prepare_session_logs(logs)
+    return render_template('admin/logs.html', logs=entries, limit=limit)
 
 
 @main.route('/admin/admins', methods=['GET', 'POST'])
