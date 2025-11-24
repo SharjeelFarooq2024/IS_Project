@@ -1,5 +1,6 @@
 from datetime import datetime
 from functools import wraps
+import re
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, g, abort
 from sqlalchemy import or_
@@ -27,12 +28,39 @@ ROLE_HOME = {
     'patient': 'main.patient_dashboard',
 }
 
+PASSWORD_POLICY_MESSAGE = 'Password must be at least 8 characters long, include one uppercase letter, and one special character.'
+PASSWORD_POLICY_REGEX = re.compile(r'^(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{8,}$')
+
+
+def _render_admin_admins():
+    admins = Admin.query.order_by(Admin.created_at.desc()).all()
+    admins = [_decrypt_admin(admin_user) for admin_user in admins]
+    return render_template('admin/admins.html', admins=admins)
+
+
+def _render_admin_doctors():
+    doctors = Doctor.query.order_by(Doctor.created_at.desc()).all()
+    doctors = [_decrypt_doctor(doc) for doc in doctors]
+    return render_template('admin/doctors.html', doctors=doctors)
+
+
+def _render_admin_patients():
+    patients = Patient.query.order_by(Patient.created_at.desc()).all()
+    patients = [_decrypt_patient(patient) for patient in patients]
+    return render_template('admin/patients.html', patients=patients)
+
 
 def _safe_int(value):
     try:
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+def _is_strong_password(password: str | None) -> bool:
+    if not password:
+        return False
+    return bool(PASSWORD_POLICY_REGEX.match(password))
 
 
 def _parse_date(value):
@@ -63,6 +91,19 @@ def _update_keyword_index(
     record_title: str | None = None,
     record_body: str | None = None,
 ):
+    def _keyword_variants(keyword: str) -> list[str]:
+        normalized = keyword.strip().lower()
+        if not normalized:
+            return []
+
+        variants: list[str] = [normalized]
+        # Persist short, deterministic prefixes so hashed lookups can support
+        # "starts with" matches without ever touching decrypted text.
+        max_prefix = min(len(normalized), 6)
+        for length in range(2, max_prefix):
+            variants.append(normalized[:length])
+        return variants
+
     keywords = normalize_keywords(raw_keywords)
 
     if record_title:
@@ -87,9 +128,12 @@ def _update_keyword_index(
     record.keyword_hash = ', '.join(keywords)
     HealthRecordKeyword.query.filter_by(record_id=record.id).delete(synchronize_session=False)
 
-    unique_tokens = {hash_keyword(keyword) for keyword in keywords}
-    for token in unique_tokens:
-        db.session.add(HealthRecordKeyword(record_id=record.id, encrypted_keyword=token))
+    unique_hashes: set[str] = set()
+    for keyword in keywords:
+        for variant in _keyword_variants(keyword):
+            unique_hashes.add(hash_keyword(variant))
+    for token_hash in unique_hashes:
+        db.session.add(HealthRecordKeyword(record_id=record.id, encrypted_keyword=token_hash))
 
 
 def _apply_keyword_search(query, search_term: str | None):
@@ -97,48 +141,23 @@ def _apply_keyword_search(query, search_term: str | None):
         return query
 
     tokens = normalize_keywords(search_term)
-    token_hashes = [hash_keyword(token) for token in tokens]
-    filters = []
-
-    if token_hashes:
-        query = query.join(HealthRecordKeyword, isouter=True)
-        filters.append(HealthRecordKeyword.encrypted_keyword.in_(token_hashes))
-
-    partial_matches = []
-    for token in tokens:
-        if token:
-            # Allow substring matches on the stored plaintext keywords for fuzzy searching.
-            partial_matches.append(HealthRecord.keyword_hash.ilike(f"%{token}%"))
-
-    if partial_matches:
-        filters.append(or_(*partial_matches))
-
-    if not filters:
+    token_hashes = [hash_keyword(token) for token in tokens if token]
+    if not token_hashes:
         return query
 
-    return query.filter(or_(*filters)).distinct()
+    # Only rely on the encrypted keyword index so partial plaintext matches do not leak
+    # information about the decrypted content during search.
+    return (
+        query.join(HealthRecordKeyword)
+        .filter(HealthRecordKeyword.encrypted_keyword.in_(token_hashes))
+        .distinct()
+    )
 
 
 def _filter_records_by_search(records, search_term: str | None):
-    if not search_term:
-        return records
-
-    lowered = search_term.lower()
-    filtered = []
-
-    for record in records:
-        title = getattr(record, 'decrypted_record_name', '')
-        keywords = record.keyword_hash or ''
-        body = getattr(record, 'decrypted_record', '')
-
-        if (
-            (title and lowered in title.lower())
-            or (keywords and lowered in keywords.lower())
-            or (body and lowered in body.lower())
-        ):
-            filtered.append(record)
-
-    return filtered
+    # Legacy helper retained for compatibility; filtering now occurs exclusively through
+    # encrypted keyword hashes so we no longer inspect decrypted payloads for search.
+    return records
 
 
 def _normalize_identity(value: str | None) -> str:
@@ -283,6 +302,16 @@ def load_logged_in_user():
         g.current_user = user
 
 
+@main.after_app_request
+def apply_cache_headers(response):
+    # Prevent sensitive pages from being cached so browser back button cannot
+    # resurrect authenticated views after logout.
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, private'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
+
 def _login_user(role: str, user_id: int):
     session.clear()
     session['user_role'] = role
@@ -411,6 +440,56 @@ def admin_dashboard():
     )
 
 
+@main.route('/admin/profile', methods=['GET', 'POST'])
+@role_required('admin')
+def admin_profile():
+    admin_user = Admin.query.get_or_404(g.current_user.id)
+    _decrypt_admin(admin_user)
+
+    if request.method == 'POST':
+        email = (request.form.get('email') or '').strip() or None
+        password = request.form.get('password', '')
+
+        email_lookup = None
+        encrypted_email = None
+        if email:
+            email_lookup = _hash_identity(email)
+            if email_lookup is None:
+                flash('Please provide a valid email address.', 'danger')
+                return render_template('admin/profile.html', admin_user=admin_user), 400
+
+            conflict = (
+                Admin.query.filter(Admin.email_lookup == email_lookup, Admin.id != admin_user.id).first()
+            )
+            if conflict:
+                flash('Another admin already uses that email.', 'warning')
+                return render_template('admin/profile.html', admin_user=admin_user), 400
+
+            encrypted_email = encrypt_data(email)
+
+        admin_user.email = encrypted_email
+        admin_user.email_lookup = email_lookup
+
+        if password:
+            if not _is_strong_password(password):
+                flash(PASSWORD_POLICY_MESSAGE, 'danger')
+                return render_template('admin/profile.html', admin_user=admin_user), 400
+            admin_user.password_hash = password
+
+        try:
+            db.session.commit()
+            _decrypt_admin(admin_user)
+            g.current_user = admin_user
+            flash('Profile updated successfully.', 'success')
+        except Exception as exc:
+            db.session.rollback()
+            flash(f'Unable to update profile: {exc}', 'danger')
+
+        return redirect(url_for('main.admin_profile'))
+
+    return render_template('admin/profile.html', admin_user=admin_user)
+
+
 @main.route('/admin/logs')
 @role_required('admin')
 def admin_logs():
@@ -435,17 +514,21 @@ def admin_admins():
 
         if not username or not password:
             flash('Username and password are required.', 'danger')
-            return redirect(url_for('main.admin_admins'))
+            return _render_admin_admins(), 400
+
+        if not _is_strong_password(password):
+            flash(PASSWORD_POLICY_MESSAGE, 'danger')
+            return _render_admin_admins(), 400
 
         username_lookup = _hash_identity(username)
         if username_lookup is None:
             flash('A valid username is required.', 'danger')
-            return redirect(url_for('main.admin_admins'))
+            return _render_admin_admins(), 400
 
         existing_username = Admin.query.filter_by(username_lookup=username_lookup).first()
         if existing_username:
             flash('An admin with that username already exists.', 'warning')
-            return redirect(url_for('main.admin_admins'))
+            return _render_admin_admins(), 400
 
         email_lookup = None
         encrypted_email = None
@@ -453,12 +536,12 @@ def admin_admins():
             email_lookup = _hash_identity(email)
             if email_lookup is None:
                 flash('A valid email address is required.', 'danger')
-                return redirect(url_for('main.admin_admins'))
+                return _render_admin_admins(), 400
 
             existing_email = Admin.query.filter_by(email_lookup=email_lookup).first()
             if existing_email:
                 flash('An admin with that email already exists.', 'warning')
-                return redirect(url_for('main.admin_admins'))
+                return _render_admin_admins(), 400
 
             encrypted_email = encrypt_data(email)
 
@@ -476,12 +559,11 @@ def admin_admins():
         except Exception as exc:
             db.session.rollback()
             flash(f'Unable to create admin: {exc}', 'danger')
+            return _render_admin_admins(), 500
 
         return redirect(url_for('main.admin_admins'))
 
-    admins = Admin.query.order_by(Admin.created_at.desc()).all()
-    admins = [_decrypt_admin(admin_user) for admin_user in admins]
-    return render_template('admin/admins.html', admins=admins)
+    return _render_admin_admins()
 
 
 @main.route('/admin/admins/<int:admin_id>/edit', methods=['GET', 'POST'])
@@ -534,6 +616,9 @@ def admin_edit_admin(admin_id):
         admin_user.email_lookup = email_lookup
 
         if password:
+            if not _is_strong_password(password):
+                flash(PASSWORD_POLICY_MESSAGE, 'danger')
+                return redirect(url_for('main.admin_edit_admin', admin_id=admin_id))
             admin_user.password_hash = password
 
         try:
@@ -585,16 +670,20 @@ def admin_doctors():
 
         if not all([name, email, password]):
             flash('Name, email, and password are required.', 'danger')
-            return redirect(url_for('main.admin_doctors'))
+            return _render_admin_doctors(), 400
+
+        if not _is_strong_password(password):
+            flash(PASSWORD_POLICY_MESSAGE, 'danger')
+            return _render_admin_doctors(), 400
 
         email_lookup = _hash_identity(email)
         if email_lookup is None:
             flash('A valid email address is required.', 'danger')
-            return redirect(url_for('main.admin_doctors'))
+            return _render_admin_doctors(), 400
 
         if Doctor.query.filter_by(email_lookup=email_lookup).first():
             flash('A doctor with that email already exists.', 'warning')
-            return redirect(url_for('main.admin_doctors'))
+            return _render_admin_doctors(), 400
 
         try:
             doctor = Doctor(
@@ -610,12 +699,11 @@ def admin_doctors():
         except Exception as exc:
             db.session.rollback()
             flash(f'Unable to create doctor: {exc}', 'danger')
+            return _render_admin_doctors(), 500
 
         return redirect(url_for('main.admin_doctors'))
 
-    doctors = Doctor.query.order_by(Doctor.created_at.desc()).all()
-    doctors = [_decrypt_doctor(doc) for doc in doctors]
-    return render_template('admin/doctors.html', doctors=doctors)
+    return _render_admin_doctors()
 
 
 @main.route('/admin/doctors/<int:doctor_id>/edit', methods=['GET', 'POST'])
@@ -652,6 +740,9 @@ def admin_edit_doctor(doctor_id):
 
         password = request.form.get('password')
         if password:
+            if not _is_strong_password(password):
+                flash(PASSWORD_POLICY_MESSAGE, 'danger')
+                return redirect(url_for('main.admin_edit_doctor', doctor_id=doctor.id))
             doctor.password_hash = password
 
         try:
@@ -694,16 +785,20 @@ def admin_patients():
 
         if not all([name, email, password]):
             flash('Name, email, and password are required.', 'danger')
-            return redirect(url_for('main.admin_patients'))
+            return _render_admin_patients(), 400
+
+        if not _is_strong_password(password):
+            flash(PASSWORD_POLICY_MESSAGE, 'danger')
+            return _render_admin_patients(), 400
 
         email_lookup = _hash_identity(email)
         if email_lookup is None:
             flash('A valid email address is required.', 'danger')
-            return redirect(url_for('main.admin_patients'))
+            return _render_admin_patients(), 400
 
         if Patient.query.filter_by(email_lookup=email_lookup).first():
             flash('A patient with that email already exists.', 'warning')
-            return redirect(url_for('main.admin_patients'))
+            return _render_admin_patients(), 400
 
         try:
             patient = Patient(
@@ -720,12 +815,11 @@ def admin_patients():
         except Exception as exc:
             db.session.rollback()
             flash(f'Unable to add patient: {exc}', 'danger')
+            return _render_admin_patients(), 500
 
         return redirect(url_for('main.admin_patients'))
 
-    patients = Patient.query.order_by(Patient.created_at.desc()).all()
-    patients = [_decrypt_patient(patient) for patient in patients]
-    return render_template('admin/patients.html', patients=patients)
+    return _render_admin_patients()
 
 
 @main.route('/admin/patients/<int:patient_id>/edit', methods=['GET', 'POST'])
@@ -764,6 +858,9 @@ def admin_edit_patient(patient_id):
 
         password = request.form.get('password')
         if password:
+            if not _is_strong_password(password):
+                flash(PASSWORD_POLICY_MESSAGE, 'danger')
+                return redirect(url_for('main.admin_edit_patient', patient_id=patient.id))
             patient.password_hash = password
 
         try:
@@ -915,6 +1012,55 @@ def doctor_dashboard():
     )
 
 
+@main.route('/doctor/profile', methods=['GET', 'POST'])
+@role_required('doctor')
+def doctor_profile():
+    doctor = Doctor.query.get_or_404(g.current_user.id)
+    _decrypt_doctor(doctor)
+
+    if request.method == 'POST':
+        email = (request.form.get('email') or '').strip()
+        password = request.form.get('password', '')
+
+        if not email:
+            flash('Email is required.', 'danger')
+            return render_template('doctor/profile.html', doctor=doctor), 400
+
+        email_lookup = _hash_identity(email)
+        if email_lookup is None:
+            flash('Please provide a valid email address.', 'danger')
+            return render_template('doctor/profile.html', doctor=doctor), 400
+
+        conflict = (
+            Doctor.query.filter(Doctor.email_lookup == email_lookup, Doctor.id != doctor.id).first()
+        )
+        if conflict:
+            flash('Another doctor already uses that email.', 'warning')
+            return render_template('doctor/profile.html', doctor=doctor), 400
+
+        doctor.email = encrypt_data(email)
+        doctor.email_lookup = email_lookup
+
+        if password:
+            if not _is_strong_password(password):
+                flash(PASSWORD_POLICY_MESSAGE, 'danger')
+                return render_template('doctor/profile.html', doctor=doctor), 400
+            doctor.password_hash = password
+
+        try:
+            db.session.commit()
+            _decrypt_doctor(doctor)
+            g.current_user = doctor
+            flash('Profile updated successfully.', 'success')
+        except Exception as exc:
+            db.session.rollback()
+            flash(f'Unable to update profile: {exc}', 'danger')
+
+        return redirect(url_for('main.doctor_profile'))
+
+    return render_template('doctor/profile.html', doctor=doctor)
+
+
 @main.route('/doctor/records', methods=['POST'])
 @role_required('doctor')
 def doctor_add_record():
@@ -1048,6 +1194,54 @@ def patient_dashboard():
     )
 
 
+@main.route('/patient/profile', methods=['GET', 'POST'])
+@role_required('patient')
+def patient_profile():
+    patient = Patient.query.get_or_404(g.current_user.id)
+    _decrypt_patient(patient)
+
+    if request.method == 'POST':
+        email = (request.form.get('email') or '').strip()
+        password = request.form.get('password', '')
+
+        if not email:
+            flash('Email is required.', 'danger')
+            return render_template('patient/profile.html', patient=patient), 400
+
+        email_lookup = _hash_identity(email)
+        if email_lookup is None:
+            flash('Please provide a valid email address.', 'danger')
+            return render_template('patient/profile.html', patient=patient), 400
+
+        existing = (
+            Patient.query.filter(Patient.email_lookup == email_lookup, Patient.id != patient.id).first()
+        )
+        if existing:
+            flash('Another account already uses that email address.', 'warning')
+            return render_template('patient/profile.html', patient=patient), 400
+
+        patient.email = encrypt_data(email)
+        patient.email_lookup = email_lookup
+
+        if password:
+            if not _is_strong_password(password):
+                flash(PASSWORD_POLICY_MESSAGE, 'danger')
+                return render_template('patient/profile.html', patient=patient), 400
+            patient.password_hash = password
+
+        try:
+            db.session.commit()
+            _decrypt_patient(patient)
+            g.current_user = patient
+            flash('Profile updated successfully.', 'success')
+        except Exception as exc:
+            db.session.rollback()
+            flash(f'Unable to update profile: {exc}', 'danger')
+
+        return redirect(url_for('main.patient_profile'))
+
+    return render_template('patient/profile.html', patient=patient)
+
 @main.route('/patient/records/<int:record_id>')
 @role_required('patient')
 def patient_record_detail(record_id):
@@ -1060,46 +1254,3 @@ def patient_record_detail(record_id):
     _attach_decrypted_content(record)
 
     return render_template('patient/record_detail.html', patient=patient, record=record)
-
-
-@main.route('/patient/profile', methods=['POST'])
-@role_required('patient')
-def patient_update_profile():
-    patient: Patient = g.current_user
-
-    name = (request.form.get('name') or '').strip()
-    email = (request.form.get('email') or '').strip()
-    gender = request.form.get('gender') or None
-    dob = _parse_date(request.form.get('dob'))
-
-    if not name or not email:
-        flash('Name and email are required.', 'danger')
-        return redirect(url_for('main.patient_dashboard'))
-
-    email_lookup = _hash_identity(email)
-    if email_lookup is None:
-        flash('Please provide a valid email address.', 'danger')
-        return redirect(url_for('main.patient_dashboard'))
-
-    existing = (
-        Patient.query.filter(Patient.email_lookup == email_lookup, Patient.id != patient.id).first()
-    )
-    if existing:
-        flash('Another account already uses that email address.', 'warning')
-        return redirect(url_for('main.patient_dashboard'))
-
-    patient.name = encrypt_data(name)
-    patient.email = encrypt_data(email)
-    patient.email_lookup = email_lookup
-    patient.gender = gender
-    patient.dob = dob
-
-    try:
-        db.session.commit()
-        _decrypt_patient(patient)
-        flash('Profile updated successfully.', 'success')
-    except Exception as exc:
-        db.session.rollback()
-        flash(f'Unable to update profile: {exc}', 'danger')
-
-    return redirect(url_for('main.patient_dashboard'))

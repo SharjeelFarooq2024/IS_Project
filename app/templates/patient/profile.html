@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+
+{% block title %}My Profile · {{ patient.decrypted_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+    <div>
+        <h1 class="page-title"><i class="fas fa-user"></i> {{ patient.decrypted_name }}</h1>
+        <p class="text-muted mb-0">Member since {{ patient.created_at.strftime('%b %d, %Y') if patient.created_at else 'N/A' }}</p>
+    </div>
+    <a href="{{ url_for('main.patient_dashboard') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Patient Dashboard
+    </a>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-5">
+        <div class="card h-100">
+            <div class="card-header"><i class="fas fa-id-card"></i> Account Snapshot</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-5">Full Name</dt>
+                    <dd class="col-sm-7">{{ patient.decrypted_name }}</dd>
+                    <dt class="col-sm-5">Email</dt>
+                    <dd class="col-sm-7">{{ patient.decrypted_email or 'Not set' }}</dd>
+                    <dt class="col-sm-5">Date of Birth</dt>
+                    <dd class="col-sm-7">{{ patient.dob.strftime('%b %d, %Y') if patient.dob else '—' }}</dd>
+                    <dt class="col-sm-5">Gender</dt>
+                    <dd class="col-sm-7">{{ patient.gender or '—' }}</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-7">
+        <div class="card h-100">
+            <div class="card-header"><i class="fas fa-pen"></i> Update Contact</div>
+            <div class="card-body">
+                <form method="post" class="form-styled" data-hash-password="true">
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" name="email" value="{{ request.form.get('email', patient.decrypted_email or '') }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">New Password (optional)</label>
+                        <input type="password" class="form-control" name="password" placeholder="Leave blank to keep current" data-password-field="true">
+                    </div>
+                    <p class="text-muted small mb-3">Need to change your name or demographic information? Please contact an administrator.</p>
+                    <div class="d-flex justify-content-end gap-3">
+                        <a href="{{ url_for('main.patient_dashboard') }}" class="btn btn-outline-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-success-custom btn-custom">
+                            <i class="fas fa-save"></i> Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

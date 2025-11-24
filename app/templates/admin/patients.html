@@ -21,23 +21,24 @@
                 <form method="post" action="{{ url_for('main.admin_patients') }}" class="form-styled" data-hash-password="true">
                     <div class="mb-3">
                         <label class="form-label">Full Name</label>
-                        <input type="text" class="form-control" name="name" placeholder="Alex Johnson" required>
+                        <input type="text" class="form-control" name="name" placeholder="Alex Johnson" value="{{ request.form.get('name', '') }}" required>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Email</label>
-                        <input type="email" class="form-control" name="email" placeholder="patient@email.com" required>
+                        <input type="email" class="form-control" name="email" placeholder="patient@email.com" value="{{ request.form.get('email', '') }}" required>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Date of Birth</label>
-                        <input type="date" class="form-control" name="dob">
+                        <input type="date" class="form-control" name="dob" value="{{ request.form.get('dob', '') }}">
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Gender</label>
                         <select class="form-select" name="gender">
-                            <option value="">Prefer not to say</option>
-                            <option value="Male">Male</option>
-                            <option value="Female">Female</option>
-                            <option value="Other">Other</option>
+                            {% set selected_gender = request.form.get('gender', '') %}
+                            <option value="" {% if selected_gender == '' %}selected{% endif %}>Prefer not to say</option>
+                            <option value="Male" {% if selected_gender == 'Male' %}selected{% endif %}>Male</option>
+                            <option value="Female" {% if selected_gender == 'Female' %}selected{% endif %}>Female</option>
+                            <option value="Other" {% if selected_gender == 'Other' %}selected{% endif %}>Other</option>
                         </select>
                     </div>
                     <div class="mb-3">

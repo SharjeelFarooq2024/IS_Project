@@ -21,15 +21,15 @@
                 <form method="post" action="{{ url_for('main.admin_doctors') }}" class="form-styled" data-hash-password="true">
                     <div class="mb-3">
                         <label class="form-label">Full Name</label>
-                        <input type="text" class="form-control" name="name" placeholder="Dr. Sarah Connor" required>
+                        <input type="text" class="form-control" name="name" placeholder="Dr. Sarah Connor" value="{{ request.form.get('name', '') }}" required>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Specialization</label>
-                        <input type="text" class="form-control" name="specialization" placeholder="Oncology">
+                        <input type="text" class="form-control" name="specialization" placeholder="Oncology" value="{{ request.form.get('specialization', '') }}">
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Email</label>
-                        <input type="email" class="form-control" name="email" placeholder="doctor@securehealth.com" required>
+                        <input type="email" class="form-control" name="email" placeholder="doctor@securehealth.com" value="{{ request.form.get('email', '') }}" required>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Password</label>

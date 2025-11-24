@@ -47,6 +47,12 @@ def hash_keywords(keywords: Iterable[str]) -> List[str]:
 
 STOPWORDS = {
     'a',
+    'patient',
+    'says',
+    'only',
+    'little',
+    'bit',
+    'say',
     'an',
     'and',
     'are',

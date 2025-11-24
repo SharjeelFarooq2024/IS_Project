@@ -21,11 +21,11 @@
                 <form method="post" action="{{ url_for('main.admin_admins') }}" class="form-styled" data-hash-password="true">
                     <div class="mb-3">
                         <label class="form-label">Username</label>
-                        <input type="text" class="form-control" name="username" placeholder="admin_user" required>
+                        <input type="text" class="form-control" name="username" placeholder="admin_user" value="{{ request.form.get('username', '') }}" required>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Email</label>
-                        <input type="email" class="form-control" name="email" placeholder="admin@securevault.com">
+                        <input type="email" class="form-control" name="email" placeholder="admin@securevault.com" value="{{ request.form.get('email', '') }}">
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Password</label>
