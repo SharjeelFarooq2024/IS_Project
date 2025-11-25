@@ -1,6 +1,9 @@
 from datetime import datetime
 from functools import wraps
 import re
+from hashlib import sha256
+
+from werkzeug.security import generate_password_hash, check_password_hash
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, g, abort
 from sqlalchemy import or_
@@ -30,6 +33,7 @@ ROLE_HOME = {
 
 PASSWORD_POLICY_MESSAGE = 'Password must be at least 8 characters long, include one uppercase letter, and one special character.'
 PASSWORD_POLICY_REGEX = re.compile(r'^(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{8,}$')
+HASHED_PASSWORD_REGEX = re.compile(r'^[a-f0-9]{64}$', re.IGNORECASE)
 
 
 def _render_admin_admins():
@@ -60,7 +64,61 @@ def _safe_int(value):
 def _is_strong_password(password: str | None) -> bool:
     if not password:
         return False
-    return bool(PASSWORD_POLICY_REGEX.match(password))
+
+    trimmed = password.strip()
+    if HASHED_PASSWORD_REGEX.fullmatch(trimmed):
+        return True
+
+    return bool(PASSWORD_POLICY_REGEX.match(trimmed))
+
+
+def _hash_password_sha256(password: str) -> str:
+    return sha256(password.encode('utf-8')).hexdigest()
+
+
+def _normalize_password_input(password: str | None) -> str:
+    if not password:
+        return ''
+    trimmed = password.strip()
+    if HASHED_PASSWORD_REGEX.fullmatch(trimmed):
+        return trimmed
+    return _hash_password_sha256(trimmed)
+
+
+def _derive_storage_password(password: str | None) -> str:
+    normalized = _normalize_password_input(password)
+    return generate_password_hash(normalized)
+
+
+def _upgrade_password_hash(user, normalized_secret: str):
+    try:
+        user.password_hash = generate_password_hash(normalized_secret)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+
+def _password_matches(user, submitted_password: str | None) -> bool:
+    if user is None or not submitted_password:
+        return False
+
+    normalized = _normalize_password_input(submitted_password)
+    stored = (user.password_hash or '').strip()
+
+    if stored.startswith('pbkdf2:'):
+        return check_password_hash(stored, normalized)
+
+    stored_normalized = (
+        stored if HASHED_PASSWORD_REGEX.fullmatch(stored)
+        else _hash_password_sha256(stored)
+    )
+
+    if stored_normalized == normalized:
+        _upgrade_password_hash(user, normalized)
+        return True
+
+    return False
+
 
 
 def _parse_date(value):
@@ -379,7 +437,7 @@ def login(role):
         else:
             user = Patient.query.filter_by(email_lookup=lookup).first() if lookup else None
 
-        if user is None or user.password_hash != password:
+        if user is None or not _password_matches(user, password):
             flash('Invalid credentials. Please try again.', 'danger')
             return redirect(url_for('main.login', role=role))
 
@@ -474,7 +532,7 @@ def admin_profile():
             if not _is_strong_password(password):
                 flash(PASSWORD_POLICY_MESSAGE, 'danger')
                 return render_template('admin/profile.html', admin_user=admin_user), 400
-            admin_user.password_hash = password
+            admin_user.password_hash = _derive_storage_password(password)
 
         try:
             db.session.commit()
@@ -551,7 +609,7 @@ def admin_admins():
                 username_lookup=username_lookup,
                 email=encrypted_email,
                 email_lookup=email_lookup,
-                password_hash=password,
+                password_hash=_derive_storage_password(password),
             )
             db.session.add(admin_user)
             db.session.commit()
@@ -619,7 +677,7 @@ def admin_edit_admin(admin_id):
             if not _is_strong_password(password):
                 flash(PASSWORD_POLICY_MESSAGE, 'danger')
                 return redirect(url_for('main.admin_edit_admin', admin_id=admin_id))
-            admin_user.password_hash = password
+            admin_user.password_hash = _derive_storage_password(password)
 
         try:
             db.session.commit()
@@ -691,7 +749,7 @@ def admin_doctors():
                 specialization=specialization,
                 email=encrypt_data(email),
                 email_lookup=email_lookup,
-                password_hash=password,
+                password_hash=_derive_storage_password(password),
             )
             db.session.add(doctor)
             db.session.commit()
@@ -743,7 +801,7 @@ def admin_edit_doctor(doctor_id):
             if not _is_strong_password(password):
                 flash(PASSWORD_POLICY_MESSAGE, 'danger')
                 return redirect(url_for('main.admin_edit_doctor', doctor_id=doctor.id))
-            doctor.password_hash = password
+            doctor.password_hash = _derive_storage_password(password)
 
         try:
             db.session.commit()
@@ -807,7 +865,7 @@ def admin_patients():
                 gender=gender,
                 email=encrypt_data(email),
                 email_lookup=email_lookup,
-                password_hash=password,
+                password_hash=_derive_storage_password(password),
             )
             db.session.add(patient)
             db.session.commit()
@@ -861,7 +919,7 @@ def admin_edit_patient(patient_id):
             if not _is_strong_password(password):
                 flash(PASSWORD_POLICY_MESSAGE, 'danger')
                 return redirect(url_for('main.admin_edit_patient', patient_id=patient.id))
-            patient.password_hash = password
+            patient.password_hash = _derive_storage_password(password)
 
         try:
             db.session.commit()
@@ -1045,7 +1103,7 @@ def doctor_profile():
             if not _is_strong_password(password):
                 flash(PASSWORD_POLICY_MESSAGE, 'danger')
                 return render_template('doctor/profile.html', doctor=doctor), 400
-            doctor.password_hash = password
+            doctor.password_hash = _derive_storage_password(password)
 
         try:
             db.session.commit()
@@ -1227,7 +1285,7 @@ def patient_profile():
             if not _is_strong_password(password):
                 flash(PASSWORD_POLICY_MESSAGE, 'danger')
                 return render_template('patient/profile.html', patient=patient), 400
-            patient.password_hash = password
+            patient.password_hash = _derive_storage_password(password)
 
         try:
             db.session.commit()
