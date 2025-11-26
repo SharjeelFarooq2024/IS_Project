@@ -51,7 +51,7 @@
                                 <td>{{ record.decrypted_record_name or 'Untitled Record' }}</td>
                                 <td>{{ record.patient.decrypted_name if record.patient else 'Unknown Patient' }}</td>
                                 <td>{{ record.doctor.decrypted_name if record.doctor else 'Unassigned' }}</td>
-                                <td>{{ record.keyword_hash }}</td>
+                                <td>{{ record.decrypted_keywords }}</td>
                                 <td>{{ record.created_at.strftime('%b %d, %Y %H:%M') if record.created_at else 'N/A' }}</td>
                             </tr>
                         {% endfor %}

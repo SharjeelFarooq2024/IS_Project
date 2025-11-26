@@ -87,12 +87,12 @@ def _normalize_password_input(password: str | None) -> str:
 
 def _derive_storage_password(password: str | None) -> str:
     normalized = _normalize_password_input(password)
-    return generate_password_hash(normalized)
+    return generate_password_hash(normalized, method='pbkdf2:sha256')
 
 
 def _upgrade_password_hash(user, normalized_secret: str):
     try:
-        user.password_hash = generate_password_hash(normalized_secret)
+        user.password_hash = generate_password_hash(normalized_secret, method='pbkdf2:sha256')
         db.session.commit()
     except Exception:
         db.session.rollback()
@@ -135,6 +135,10 @@ def _attach_decrypted_content(record: HealthRecord):
     record.decrypted_record = decrypted or ''
     decrypted_name = decrypt_data(record.record_name)
     record.decrypted_record_name = (decrypted_name or '').strip()
+    decrypted_keywords = decrypt_data(record.keyword_hash) if record.keyword_hash else ''
+    if decrypted_keywords is None and record.keyword_hash:
+        decrypted_keywords = record.keyword_hash
+    record.decrypted_keywords = (decrypted_keywords or '').strip()
 
     if record.doctor:
         _decrypt_doctor(record.doctor)
@@ -183,7 +187,10 @@ def _update_keyword_index(
         deduped.append(lowered)
     keywords = deduped
 
-    record.keyword_hash = ', '.join(keywords)
+    # Persist encrypted keyword labels so stored values cannot leak search terms.
+    keyword_summary = ', '.join(keywords)
+    encrypted_keywords = encrypt_data(keyword_summary or '')
+    record.keyword_hash = encrypted_keywords or ''
     HealthRecordKeyword.query.filter_by(record_id=record.id).delete(synchronize_session=False)
 
     unique_hashes: set[str] = set()
