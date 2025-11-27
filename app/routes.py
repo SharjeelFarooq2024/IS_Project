@@ -403,7 +403,8 @@ def role_required(role: str):
 
 @main.route('/')
 def landing():
-    if g.current_user is not None and g.user_role in ROLE_HOME:
+    force_role_select = request.args.get('force')
+    if not force_role_select and g.current_user is not None and g.user_role in ROLE_HOME:
         return redirect(url_for(ROLE_HOME[g.user_role]))
     return render_template('index.html')
 
