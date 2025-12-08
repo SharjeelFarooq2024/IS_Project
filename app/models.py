@@ -74,3 +74,18 @@ class UserSessionLog(db.Model):
     event = db.Column(db.Enum('login', 'logout'), nullable=False)
     user_lookup = db.Column(db.String(64))
     created_at = db.Column(db.DateTime, server_default=db.func.current_timestamp(), index=True)
+
+
+class LoginThrottle(db.Model):
+    __tablename__ = 'login_throttles'
+    id = db.Column(db.Integer, primary_key=True)
+    role = db.Column(db.Enum('admin', 'doctor', 'patient'), nullable=False, index=True)
+    identity_lookup = db.Column(db.String(64), nullable=False)
+    fail_count = db.Column(db.Integer, nullable=False, default=0)
+    locked_until = db.Column(db.DateTime)
+    last_failure_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, server_default=db.func.current_timestamp())
+
+    __table_args__ = (
+        db.UniqueConstraint('role', 'identity_lookup', name='uq_login_throttle_identity'),
+    )

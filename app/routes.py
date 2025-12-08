@@ -1,14 +1,15 @@
-from datetime import datetime
+from datetime import datetime, timedelta
+import math
 from functools import wraps
 import re
 from hashlib import sha256
 
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, g, abort
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, g, abort, current_app
 from sqlalchemy import or_
 
-from app import db
+from app import db, limiter
 from app.models import (
     Admin,
     Doctor,
@@ -17,6 +18,7 @@ from app.models import (
     HealthRecordKeyword,
     DoctorPatientAccess,
     UserSessionLog,
+    LoginThrottle,
 )
 
 from app.security.encryption import encrypt_data
@@ -35,6 +37,15 @@ PASSWORD_POLICY_MESSAGE = 'Password must be at least 8 characters long, include 
 PASSWORD_POLICY_REGEX = re.compile(r'^(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{8,}$')
 HASHED_PASSWORD_REGEX = re.compile(r'^[a-f0-9]{64}$', re.IGNORECASE)
 
+LOCKOUT_FAILURE_LIMIT = 5
+LOCKOUT_DURATION = timedelta(minutes=10)
+
+
+def _login_rate_limit_key():
+    identifier = (request.form.get('identifier') or '').strip().lower()
+    remote_addr = request.remote_addr or 'unknown'
+    return f"{remote_addr}:{identifier}" if identifier else remote_addr
+
 
 def _render_admin_admins():
     admins = Admin.query.order_by(Admin.created_at.desc()).all()
@@ -52,6 +63,65 @@ def _render_admin_patients():
     patients = Patient.query.order_by(Patient.created_at.desc()).all()
     patients = [_decrypt_patient(patient) for patient in patients]
     return render_template('admin/patients.html', patients=patients)
+
+
+def _get_login_throttle(role: str, lookup: str | None):
+    if not lookup:
+        return None
+    return LoginThrottle.query.filter_by(role=role, identity_lookup=lookup).first()
+
+
+def _lockout_deadline(role: str, lookup: str | None):
+    throttle = _get_login_throttle(role, lookup)
+    if throttle and throttle.locked_until and throttle.locked_until > datetime.utcnow():
+        return throttle.locked_until
+    return None
+
+
+def _record_failed_login_attempt(role: str, lookup: str | None):
+    if not lookup:
+        return
+
+    now = datetime.utcnow()
+    throttle = _get_login_throttle(role, lookup)
+    if throttle is None:
+        throttle = LoginThrottle(
+            role=role,
+            identity_lookup=lookup,
+            fail_count=1,
+            last_failure_at=now,
+        )
+        db.session.add(throttle)
+    else:
+        throttle.fail_count += 1
+        throttle.last_failure_at = now
+
+    if throttle.fail_count >= LOCKOUT_FAILURE_LIMIT:
+        throttle.locked_until = now + LOCKOUT_DURATION
+        current_app.logger.warning(
+            'Account locked due to repeated failures role=%s lookup=%s until=%s',
+            role,
+            lookup,
+            throttle.locked_until,
+        )
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+
+def _reset_login_throttle(role: str, lookup: str | None):
+    throttle = _get_login_throttle(role, lookup)
+    if throttle is None:
+        return
+
+    throttle.fail_count = 0
+    throttle.locked_until = None
+    throttle.last_failure_at = None
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
 
 
 def _safe_int(value):
@@ -249,7 +319,7 @@ def _log_session_event(role: str | None, user_id: int | None, event: str, lookup
         db.session.commit()
     except Exception as exc:
         db.session.rollback()
-        main.logger.error('Unable to persist %s event for %s (id=%s): %s', event, role, user_id, exc)
+        current_app.logger.error('Unable to persist %s event for %s (id=%s): %s', event, role, user_id, exc)
 
 
 def _decrypt_admin(admin: Admin | None):
@@ -410,6 +480,7 @@ def landing():
 
 
 @main.route('/login/<role>', methods=['GET', 'POST'])
+@limiter.limit('5 per minute', key_func=_login_rate_limit_key, methods=['POST'])
 def login(role):
     if role not in ROLE_HOME:
         abort(404)
@@ -426,6 +497,24 @@ def login(role):
             return redirect(url_for('main.login', role=role))
 
         lookup = _hash_identity(identifier)
+
+        locked_until = _lockout_deadline(role, lookup)
+        if locked_until:
+            remaining = max(
+                1,
+                math.ceil((locked_until - datetime.utcnow()).total_seconds() / 60),
+            )
+            flash(
+                f'Too many failed attempts detected. This account is locked for {remaining} minute(s).',
+                'danger',
+            )
+            current_app.logger.warning(
+                'Login blocked during lockout role=%s lookup=%s ip=%s',
+                role,
+                lookup,
+                request.remote_addr,
+            )
+            return redirect(url_for('main.login', role=role)), 423
 
         if role == 'admin':
             user = None
@@ -446,15 +535,28 @@ def login(role):
             user = Patient.query.filter_by(email_lookup=lookup).first() if lookup else None
 
         if user is None or not _password_matches(user, password):
+            _record_failed_login_attempt(role, lookup)
             flash('Invalid credentials. Please try again.', 'danger')
             return redirect(url_for('main.login', role=role))
 
+        _reset_login_throttle(role, lookup)
         _login_user(role, user.id)
         _log_session_event(role, user.id, 'login', lookup)
         flash('Login successful.', 'success')
         return redirect(url_for(ROLE_HOME[role]))
 
     return render_template('auth/login.html', role=role)
+
+
+@main.app_errorhandler(429)
+def handle_rate_limit(exc):
+    current_app.logger.warning('Rate limit exceeded path=%s ip=%s', request.path, request.remote_addr)
+    flash('Too many requests. Please wait a moment before trying again.', 'warning')
+    redirect_target = request.referrer
+    if not redirect_target and request.endpoint == 'main.login':
+        role = (request.view_args or {}).get('role', 'admin')
+        redirect_target = url_for('main.login', role=role)
+    return redirect(redirect_target or url_for('main.landing')), 429
 
 
 @main.route('/logout')

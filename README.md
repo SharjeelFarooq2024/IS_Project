@@ -2,6 +2,24 @@
 
 Secure Health Vault is an information-security focused medical records portal built for coursework in Information Security. It demonstrates how to combine strong data-at-rest protection with role-based access control, encrypted search, and audit-friendly workflows for administrators, doctors, and patients.
 
+## Quick Start (TL;DR)
+1. **Clone & enter** the repository.
+2. **Create a virtual environment** and install dependencies:
+	```cmd
+	python -m venv venv
+	venv\Scripts\activate
+	pip install -r requirements.txt
+	```
+3. **Copy environment secrets** from `.env.example` to `.env` and fill in `SECRET_KEY`, `FERNET_KEY`, `HMAC_KEY`, and `SQLALCHEMY_DATABASE_URI`.
+4. **Start MySQL** and ensure the target schema exists (see *Database Setup* below).
+5. **Bootstrap the schema** with `database\schema.sql` or let SQLAlchemy create tables on first run.
+6. **Run the server**:
+	```cmd
+	venv\Scripts\activate
+	python run.py
+	```
+	The app listens on `http://127.0.0.1:5000/`; use the landing page to choose a role and log in with credentials you create via the admin portal.
+
 ## Why This Project Matters
 - Protects highly sensitive health information with opinionated defaults and minimal trust in the database layer.
 - Illustrates core course concepts: symmetric encryption, keyed hashing, least privilege, secure credential handling, and defense-in-depth for web apps.
@@ -53,16 +71,20 @@ Copy `.env.example` to `.env` (create the file if it does not exist) and set:
 3. Optionally seed initial admin/doctor/patient records through the admin UI or via custom inserts (encrypt fields with project helpers for consistency).
 
 ### Running the Application
-```powershell
-venv\Scripts\activate
-python run.py
-```
-The server defaults to `http://127.0.0.1:5000/`. Log in using the role selector and credentials created from the admin panel.
+1. Activate your environment (`venv\Scripts\activate`).
+2. Confirm MySQL is running and the `SQLALCHEMY_DATABASE_URI` in `.env` points to the correct schema/user.
+3. (First run) execute `python run.py` once to let SQLAlchemy call `db.create_all()`; if you already imported `database\schema.sql`, this step simply verifies connectivity.
+4. Start the dev server:
+	```cmd
+	python run.py
+	```
+5. Navigate to `http://127.0.0.1:5000/`, choose a role, and sign in. Create your first admin account directly in the database if none exists, then use the admin UI to provision doctors/patients.
 
 ## Security Design Notes
 - **Data at Rest:** Only encrypted blobs are stored for names, emails, titles, and health records. Even if the database leaks, plaintext identities remain protected.
 - **Search:** Keyword hashes allow exact matches, while normalized plaintext copies enable controlled fuzzy matches (substring) without exposing full content.
 - **Access Control:** Flask decorators (`role_required`) enforce role segregation. Doctors can only modify records for patients explicitly assigned by an admin.
+- **Login Hardening:** Flask-Limiter caps login attempts (5/min per IP + identifier), and persistent failures trigger a 10-minute server-side lockout recorded in the database.
 - **Credential Handling:** Admins provision passwords; users should rotate them after first login via future self-service flows. Hashes are stored exactly as submitted, so integrate a password hashing library (e.g., Argon2) if migrating beyond course scope.
 - **Environment Secrets:** Keys are intentionally externalized. Never commit `.env`; rotate keys if compromise is suspected.
 
@@ -77,6 +99,9 @@ pytest
 - **Keyword Re-indexing:** `_update_keyword_index` in `app/routes.py` controls keyword sync. Re-save a record if you change extraction rules.
 - **Auto-increment IDs:** MySQL `AUTO_INCREMENT` values continue after deletions. Use `ALTER TABLE <table> AUTO_INCREMENT = <n>` for lab resets only.
 - **Backups:** Always export encrypted data and store keys separately. Without the Fernet/HMAC keys the data is unreadable by design.
+
+## Documentation
+- `docs/development_security_report.md` — detailed walkthrough of the development process, architecture decisions, and security controls for auditors and maintainers.
 
 ## Roadmap Suggestions
 - Add user-driven password resets with mandatory rotation on first login.
