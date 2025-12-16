@@ -1,3 +1,4 @@
+from datetime import timedelta
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_limiter import Limiter
@@ -17,6 +18,11 @@ def create_app():
     app.config['SQLALCHEMY_DATABASE_URI'] = DB_URI
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config.setdefault('RATELIMIT_STORAGE_URI', 'memory://')
+
+    inactivity_minutes = int(os.getenv('SESSION_TIMEOUT_MINUTES', 30))
+    timeout_delta = timedelta(minutes=inactivity_minutes)
+    app.config.setdefault('PERMANENT_SESSION_LIFETIME', timeout_delta)
+    app.config.setdefault('SESSION_INACTIVITY_TIMEOUT', int(timeout_delta.total_seconds()))
 
     db.init_app(app)
     limiter.init_app(app)

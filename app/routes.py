@@ -413,6 +413,28 @@ def load_logged_in_user():
     if not g.user_role or not user_id:
         return
 
+    try:
+        timeout_seconds = int(current_app.config.get('SESSION_INACTIVITY_TIMEOUT', 1800))
+    except (TypeError, ValueError):
+        timeout_seconds = 1800
+
+    if timeout_seconds > 0:
+        last_activity = session.get('last_activity')
+        now_ts = datetime.utcnow().timestamp()
+        try:
+            last_seen_ts = float(last_activity) if last_activity is not None else None
+        except (TypeError, ValueError):
+            last_seen_ts = None
+
+        if last_seen_ts is not None and (now_ts - last_seen_ts) > timeout_seconds:
+            expired_role = g.user_role
+            _logout_user()
+            minutes = max(1, timeout_seconds // 60)
+            flash(f'For security, you were logged out after {minutes} minute(s) of inactivity.', 'warning')
+            if expired_role in ROLE_HOME:
+                return redirect(url_for('main.login', role=expired_role))
+            return redirect(url_for('main.landing', force=1))
+
     model_map = {
         'admin': Admin,
         'doctor': Doctor,
@@ -435,6 +457,7 @@ def load_logged_in_user():
         elif g.user_role == 'patient':
             _decrypt_patient(user)
         g.current_user = user
+        session['last_activity'] = datetime.utcnow().timestamp()
 
 
 @main.after_app_request
@@ -451,6 +474,8 @@ def _login_user(role: str, user_id: int):
     session.clear()
     session['user_role'] = role
     session['user_id'] = user_id
+    session['last_activity'] = datetime.utcnow().timestamp()
+    session.permanent = True
 
 
 def _logout_user():
